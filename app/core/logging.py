@@ -21,7 +21,7 @@ def setup_logging(level: str = "INFO") -> None:
     root.setLevel(level.upper())
 
     # Keep noisy third-party loggers quiet
-    for noisy in ("httpx", "httpcore", "urllib3"):
+    for noisy in ("httpx", "httpcore", "urllib3", "google_genai", "google_genai.models"):
         logging.getLogger(noisy).setLevel(logging.WARNING)
 
 
