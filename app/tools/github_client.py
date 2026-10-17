@@ -69,3 +69,19 @@ class GitHubClient:
             raise GitHubClientError(
                 f"GitHub API error ({exc.status}) for {repo_full_name}#{number}: {exc.data}"
             ) from exc
+
+    def get_file_content(self, repo_full_name: str, path: str, ref: str) -> str | None:
+        """Return a file's full text at a given commit, or None if unavailable."""
+        try:
+            repo = self._gh.get_repo(repo_full_name)
+            contents = repo.get_contents(path, ref=ref)
+        except GithubException as exc:
+            logger.warning("Could not fetch %s@%s (status %s)", path, ref[:7], exc.status)
+            return None
+
+        if isinstance(contents, list):  # path is a directory
+            return None
+        try:
+            return contents.decoded_content.decode("utf-8")
+        except UnicodeDecodeError:
+            return None
