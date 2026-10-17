@@ -30,14 +30,25 @@ def main() -> None:
     result = review_pull_request(repo, number)
 
     print(f"\nPR #{result.pr_number}: {result.title}")
+    print(
+        f"Pipeline: {result.raw_findings_count} raw -> "
+        f"{len(result.dropped)} dropped by validator -> "
+        f"{len(result.findings)} final after dedupe"
+    )
     by_agent = Counter(f.agent for f in result.findings)
-    print(f"Total findings: {len(result.findings)}  {dict(by_agent)}\n")
+    print(f"Final findings by agent: {dict(by_agent)}\n")
 
     for f in result.findings:
-        print(f"[{f.severity.value.upper()}][{f.agent}] {f.file_path}:{f.line}  {f.title}")
+        also = f" (also flagged by: {', '.join(f.also_flagged_by)})" if f.also_flagged_by else ""
+        print(f"[{f.severity.value.upper()}][{f.agent}] {f.file_path}:{f.line}  {f.title}{also}")
         print(f"  confidence: {f.confidence:.2f}")
         print(f"  why: {f.explanation}")
         print(f"  fix: {f.suggestion}\n")
+
+    if result.dropped:
+        print("DROPPED BY VALIDATOR:")
+        for reason in result.dropped:
+            print(f"  - {reason}")
 
     if result.errors:
         print("ERRORS:")

@@ -22,8 +22,12 @@ class ReviewState(TypedDict, total=False):
     assignments: list[Assignment]
 
     # Reducers: parallel specialists append to these instead of overwriting
-    findings: Annotated[list[Finding], operator.add]
+    findings: Annotated[list[Finding], operator.add]  # raw, straight from the agents
     errors: Annotated[list[str], operator.add]
+
+    # No reducer on purpose: the validator writes these, the aggregator overwrites
+    final_findings: list[Finding]
+    dropped: list[str]
 
 
 class SpecialistTask(TypedDict):

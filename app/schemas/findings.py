@@ -72,3 +72,5 @@ class Finding(BaseModel):
     suggestion: str
     confidence: float = Field(ge=0.0, le=1.0)
     agent: str
+    # Other agents that reported the same problem (filled in by the aggregator)
+    also_flagged_by: list[str] = Field(default_factory=list)

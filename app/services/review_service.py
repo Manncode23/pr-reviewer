@@ -2,7 +2,6 @@
 
 from app.core.logging import get_logger
 from app.graph.builder import build_review_graph
-from app.schemas.findings import SEVERITY_RANK
 from app.schemas.review import ReviewResult
 from app.tools.github_client import GitHubClient
 
@@ -18,15 +17,13 @@ def review_pull_request(
     )
 
     pr = state["pr"]
-    findings = sorted(
-        state.get("findings", []),
-        key=lambda f: (f.file_path, SEVERITY_RANK[f.severity], f.line),
-    )
     return ReviewResult(
         repo=pr.repo,
         pr_number=pr.number,
         title=pr.title,
         head_sha=pr.head_sha,
-        findings=findings,
+        raw_findings_count=len(state.get("findings", [])),
+        findings=state.get("final_findings", []),  # already validated, deduped, ranked
+        dropped=state.get("dropped", []),
         errors=state.get("errors", []),
     )

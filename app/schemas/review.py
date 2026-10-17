@@ -17,5 +17,7 @@ class ReviewResult(BaseModel):
     pr_number: int
     title: str
     head_sha: str
-    findings: list[Finding] = Field(default_factory=list)
+    raw_findings_count: int = 0  # before validation and dedupe
+    findings: list[Finding] = Field(default_factory=list)  # final, ranked
+    dropped: list[str] = Field(default_factory=list)  # reasons the validator dropped items
     errors: list[str] = Field(default_factory=list)

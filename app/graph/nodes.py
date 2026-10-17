@@ -5,8 +5,10 @@ from pathlib import Path
 from langgraph.graph import END
 from langgraph.types import Send
 
+from app.agents.aggregator import aggregate_findings
 from app.agents.registry import SPECIALISTS
 from app.agents.supervisor import plan_assignments
+from app.agents.validator import validate_findings
 from app.core.logging import get_logger
 from app.graph.state import ReviewState, SpecialistTask
 from app.tools.github_client import GitHubClient
@@ -83,3 +85,13 @@ def specialist_node(task: SpecialistTask) -> dict:
     except Exception as exc:  # noqa: BLE001 - node boundary, must not crash the graph
         logger.exception("Specialist %s failed on %s", agent, path)
         return {"errors": [f"{agent}:{path}: {exc}"]}
+
+
+def validator_node(state: ReviewState) -> dict:
+    """Runs once, after every parallel specialist has finished."""
+    kept, dropped = validate_findings(state["pr"], state.get("findings", []))
+    return {"final_findings": kept, "dropped": dropped}
+
+
+def aggregator_node(state: ReviewState) -> dict:
+    return {"final_findings": aggregate_findings(state.get("final_findings", []))}
