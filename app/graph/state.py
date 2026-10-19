@@ -29,6 +29,10 @@ class ReviewState(TypedDict, total=False):
     final_findings: list[Finding]
     dropped: list[str]
 
+    # Human-in-the-loop and publishing
+    approved_findings: list[Finding]
+    published: bool
+
 
 class SpecialistTask(TypedDict):
     """Private input for one parallel specialist run (the Send payload)."""

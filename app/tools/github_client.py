@@ -32,6 +32,15 @@ class GitHubClient:
         token = token or get_settings().github_token.get_secret_value()
         self._gh = Github(auth=Auth.Token(token))
 
+    def get_head_sha(self, repo_full_name: str, number: int) -> str:
+        """Cheap call used to build the idempotent thread ID."""
+        try:
+            return self._gh.get_repo(repo_full_name).get_pull(number).head.sha
+        except GithubException as exc:
+            raise GitHubClientError(
+                f"GitHub API error ({exc.status}) for {repo_full_name}#{number}: {exc.data}"
+            ) from exc
+
     def get_pull_request(self, repo_full_name: str, number: int) -> PullRequestData:
         """Fetch PR metadata plus every changed file with parsed hunks."""
         try:
@@ -85,3 +94,25 @@ class GitHubClient:
             return contents.decoded_content.decode("utf-8")
         except UnicodeDecodeError:
             return None
+
+    def post_review(
+        self,
+        repo_full_name: str,
+        number: int,
+        head_sha: str,
+        body: str,
+        comments: list[dict],
+    ) -> None:
+        """Post one review with inline comments (event=COMMENT: no approve/reject)."""
+        try:
+            repo = self._gh.get_repo(repo_full_name)
+            pr = repo.get_pull(number)
+            commit = repo.get_commit(head_sha)
+            pr.create_review(commit=commit, body=body, event="COMMENT", comments=comments)
+            logger.info("Posted review with %d comment(s) on %s#%s",
+                        len(comments), repo_full_name, number)
+        except GithubException as exc:
+            raise GitHubClientError(
+                f"Could not post review to {repo_full_name}#{number} "
+                f"({exc.status}): {exc.data}"
+            ) from exc

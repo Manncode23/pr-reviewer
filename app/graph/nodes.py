@@ -3,7 +3,7 @@
 from pathlib import Path
 
 from langgraph.graph import END
-from langgraph.types import Send
+from langgraph.types import Send, interrupt
 
 from app.agents.aggregator import aggregate_findings
 from app.agents.registry import SPECIALISTS
@@ -11,7 +11,8 @@ from app.agents.supervisor import plan_assignments
 from app.agents.validator import validate_findings
 from app.core.logging import get_logger
 from app.graph.state import ReviewState, SpecialistTask
-from app.tools.github_client import GitHubClient
+from app.tools.github_client import GitHubClient, GitHubClientError
+from app.tools.review_formatter import format_comment, format_review_summary
 from app.tools.static_analysis import PYTHON_SUFFIXES, analyze_python_file
 
 logger = get_logger(__name__)
@@ -95,3 +96,70 @@ def validator_node(state: ReviewState) -> dict:
 
 def aggregator_node(state: ReviewState) -> dict:
     return {"final_findings": aggregate_findings(state.get("final_findings", []))}
+
+
+def approval_node(state: ReviewState) -> dict:
+    """Pause for a human decision.
+
+    NOTE: on resume LangGraph re-runs this node from the top, so everything
+    before interrupt() must be free of side effects.
+    """
+    findings = state.get("final_findings", [])
+    if not findings:
+        return {"approved_findings": []}  # nothing to approve, no pause
+
+    pr = state["pr"]
+    decision = interrupt(
+        {
+            "message": "Choose which findings to post to GitHub.",
+            "pr": f"{pr.repo}#{pr.number}",
+            "findings": [
+                {
+                    "index": i,
+                    "severity": f.severity.value,
+                    "location": f"{f.file_path}:{f.line}",
+                    "title": f.title,
+                }
+                for i, f in enumerate(findings)
+            ],
+        }
+    )
+
+    requested = decision.get("approved", []) if isinstance(decision, dict) else []
+    approved, seen = [], set()
+    for i in requested:
+        if isinstance(i, int) and 0 <= i < len(findings) and i not in seen:
+            seen.add(i)
+            approved.append(findings[i])
+
+    logger.info("Human approved %d of %d finding(s)", len(approved), len(findings))
+    return {"approved_findings": approved}
+
+
+def make_publisher_node(client: GitHubClient):
+    def publisher(state: ReviewState) -> dict:
+        approved = state.get("approved_findings", [])
+        if not approved:
+            logger.info("Nothing approved; nothing to post")
+            return {"published": False}
+
+        pr = state["pr"]
+        comments = [
+            {
+                "path": f.file_path,
+                "line": f.line,
+                "side": "RIGHT",
+                "body": format_comment(f),
+            }
+            for f in approved
+        ]
+        summary = format_review_summary(pr, approved, total=len(state.get("final_findings", [])))
+
+        try:
+            client.post_review(pr.repo, pr.number, pr.head_sha, summary, comments)
+        except GitHubClientError as exc:
+            logger.error("Publishing failed: %s", exc)
+            return {"published": False, "errors": [f"publisher: {exc}"]}
+        return {"published": True}
+
+    return publisher
