@@ -1,0 +1,7 @@
+{
+  "model": "gemini-3.8-flash",
+  "schema": "ReviewOutput",
+  "output": {
+    "findings": []
+  }
+}

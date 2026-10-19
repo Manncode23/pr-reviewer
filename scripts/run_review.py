@@ -2,9 +2,12 @@
 
 Run from the project root:
     python -m scripts.run_review https://github.com/owner/repo/pull/1
+    python -m scripts.run_review https://github.com/owner/repo/pull/1 --force
 
 Press Ctrl+C at the prompt and re-run the same command: the saved review
 is reused instantly (no new LLM calls), because it's checkpointed in Postgres.
+--force throws the saved review away and runs it again (not allowed once
+its findings have been published).
 """
 
 import argparse
@@ -14,7 +17,7 @@ from app.core.config import get_settings
 from app.core.logging import setup_logging
 from app.graph.builder import build_review_graph
 from app.schemas.review import ReviewSession, ReviewStatus
-from app.services.review_service import ReviewService
+from app.services.review_service import ReviewService, ReviewStateError
 from app.tools.github_client import GitHubClient, parse_pr_url
 
 
@@ -42,6 +45,8 @@ def print_session(session: ReviewSession) -> None:
         f"Pipeline: {result.raw_findings_count} raw -> {len(result.dropped)} dropped "
         f"-> {len(result.findings)} final"
     )
+    if result.degraded:
+        print("WARNING: some reviewers failed, so this review may be incomplete.")
     print()
     for i, f in enumerate(result.findings, start=1):
         also = f" (also: {', '.join(f.also_flagged_by)})" if f.also_flagged_by else ""
@@ -55,11 +60,17 @@ def print_session(session: ReviewSession) -> None:
         print("\nErrors:")
         for err in result.errors:
             print(f"  - {err}")
+        if not result.published:
+            print("(Fix the cause, then re-run with --force to review this commit again.)")
 
 
 def main() -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument("pr_url")
+    parser.add_argument(
+        "--force", action="store_true",
+        help="discard the saved review for this commit and run it again",
+    )
     args = parser.parse_args()
 
     setup_logging(get_settings().log_level)
@@ -68,6 +79,13 @@ def main() -> None:
     with postgres_checkpointer() as saver:
         client = GitHubClient()
         service = ReviewService(build_review_graph(client, saver), client)
+
+        if args.force:
+            thread_id, _ = service.resolve_thread(repo, number)
+            try:
+                service.reset(thread_id)
+            except ReviewStateError as exc:
+                raise SystemExit(f"Cannot re-run: {exc}") from exc
 
         session = service.start(repo, number)
         print_session(session)

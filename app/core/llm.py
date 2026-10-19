@@ -1,7 +1,7 @@
 """Central LLM factory.
 
 Every agent gets its model from here, so model name, temperature,
-retries, and concurrency limits are controlled in one place.
+and concurrency limits are controlled in one place.
 """
 
 import threading
@@ -17,6 +17,8 @@ from app.core.logging import get_logger
 
 logger = get_logger(__name__)
 
+LLM_TIMEOUT_SECONDS = 120.0
+
 
 @lru_cache
 def get_llm() -> ChatGoogleGenerativeAI:
@@ -27,7 +29,10 @@ def get_llm() -> ChatGoogleGenerativeAI:
         model=settings.gemini_model,
         google_api_key=settings.google_api_key.get_secret_value(),
         temperature=settings.llm_temperature,
-        max_retries=settings.llm_max_retries,
+        # Retry policy lives in app.core.resilience, which tells quota errors apart
+        # from transient ones. max_retries=0 would mean "SDK default (5)", so use 1.
+        max_retries=1,
+        timeout=LLM_TIMEOUT_SECONDS,
     )
 
 

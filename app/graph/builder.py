@@ -2,6 +2,7 @@
 
 from langgraph.graph import END, START, StateGraph
 
+from app.core.tracing import configure_tracing
 from app.graph.nodes import (
     aggregator_node,
     approval_node,
@@ -19,6 +20,7 @@ from app.tools.github_client import GitHubClient
 
 def build_review_graph(client: GitHubClient | None = None, checkpointer=None):
     """Build the graph. A checkpointer is required for the approval pause."""
+    configure_tracing()
     client = client or GitHubClient()
 
     builder = StateGraph(ReviewState)

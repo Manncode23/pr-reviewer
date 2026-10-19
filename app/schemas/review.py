@@ -24,6 +24,7 @@ class ReviewResult(BaseModel):
     dropped: list[str] = Field(default_factory=list)  # reasons the validator dropped items
     errors: list[str] = Field(default_factory=list)
     published: bool = False  # True once approved findings were posted to GitHub
+    degraded: bool = False  # True if any reviewer failed, so the review may be incomplete
 
 
 class ReviewStatus(str, Enum):

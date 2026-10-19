@@ -1,0 +1,16 @@
+{
+  "model": "gemini-3.8-flash",
+  "schema": "ReviewOutput",
+  "output": {
+    "findings": [
+      {
+        "line": 6,
+        "severity": "high",
+        "title": "Command injection in os.system call",
+        "explanation": "String concatenation is used to construct a shell command executed by os.system without sanitization. If 'path' or 'dest' contains shell metacharacters, arbitrary system commands can be executed.",
+        "suggestion": "Use the subprocess module without a shell, passing arguments as a list: subprocess.run(['tar', '-czf', dest, path], check=True), or use the built-in 'tarfile' library.",
+        "confidence": 0.95
+      }
+    ]
+  }
+}

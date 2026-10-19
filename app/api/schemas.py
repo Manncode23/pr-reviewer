@@ -10,6 +10,11 @@ class StartReviewRequest(BaseModel):
     pr_url: str | None = None
     repo: str | None = None
     pr_number: int | None = Field(default=None, ge=1)
+    force: bool = Field(
+        default=False,
+        description="Discard the saved review for this commit and run again "
+        "(refused if its findings were already published)",
+    )
 
     @model_validator(mode="after")
     def _resolve(self):

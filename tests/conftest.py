@@ -1,22 +1,38 @@
-"""Shared fixtures for API tests."""
+"""Shared fixtures for the test suite."""
 
+import os
 import threading
 from dataclasses import dataclass
 
-import pytest
-from fastapi import FastAPI
-from fastapi.testclient import TestClient
-from langgraph.checkpoint.memory import MemorySaver
+# Dummy settings so tests never depend on a real .env (must be set before first use).
+os.environ.setdefault("GOOGLE_API_KEY", "test-key")
+os.environ.setdefault("GITHUB_TOKEN", "test-token")
+os.environ.setdefault("DATABASE_URL", "postgresql://test:test@localhost:5432/test")
+os.environ["LANGSMITH_TRACING"] = "false"  # tests must never send traces
 
-from app.agents import aggregator
-from app.agents.registry import SPECIALISTS
-from app.api.deps import get_webhook_secret
-from app.api.main import create_app
-from app.graph.builder import build_review_graph
-from app.services.review_manager import ReviewManager
-from app.services.review_service import ReviewService
-from tests.api_helpers import WEBHOOK_SECRET
-from tests.fakes import AGENTS, FakeClient, make_finding
+import pytest  # noqa: E402
+from fastapi import FastAPI  # noqa: E402
+from fastapi.testclient import TestClient  # noqa: E402
+from langgraph.checkpoint.memory import MemorySaver  # noqa: E402
+
+from app.agents import aggregator  # noqa: E402
+from app.agents.registry import SPECIALISTS  # noqa: E402
+from app.api.deps import get_webhook_secret  # noqa: E402
+from app.api.main import create_app  # noqa: E402
+from app.core.resilience import quota_breaker  # noqa: E402
+from app.graph.builder import build_review_graph  # noqa: E402
+from app.services.review_manager import ReviewManager  # noqa: E402
+from app.services.review_service import ReviewService  # noqa: E402
+from tests.api_helpers import WEBHOOK_SECRET  # noqa: E402
+from tests.fakes import AGENTS, FakeClient, make_finding  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def reset_llm_breaker():
+    """The circuit breaker is process-wide state, so isolate every test."""
+    quota_breaker.reset()
+    yield
+    quota_breaker.reset()
 
 
 @dataclass

@@ -1,0 +1,16 @@
+{
+  "model": "gemini-3.8-flash",
+  "schema": "ReviewOutput",
+  "output": {
+    "findings": [
+      {
+        "line": 7,
+        "severity": "critical",
+        "title": "SQL injection via f-string formatting",
+        "explanation": "The user-supplied parameter 'name' is directly interpolated into the SQL query string using an f-string. This allows attackers to manipulate the SQL statement, potentially leading to unauthorized data access or modification.",
+        "suggestion": "Use parameterized queries instead: cur.execute('SELECT id, email FROM users WHERE name = ?', (name,))",
+        "confidence": 1.0
+      }
+    ]
+  }
+}

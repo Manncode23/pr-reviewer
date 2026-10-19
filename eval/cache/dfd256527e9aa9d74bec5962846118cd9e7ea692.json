@@ -1,0 +1,16 @@
+{
+  "model": "gemini-3.8-flash",
+  "schema": "ReviewOutput",
+  "output": {
+    "findings": [
+      {
+        "line": 3,
+        "severity": "high",
+        "title": "Hardcoded API key in source code",
+        "explanation": "A sensitive API key is committed directly into the source code, risking credential exposure via version control. Credentials should be retrieved from environment variables or a dedicated secrets manager.",
+        "suggestion": "import os\nAPI_KEY = os.environ[\"API_KEY\"]",
+        "confidence": 0.95
+      }
+    ]
+  }
+}

@@ -10,6 +10,7 @@ from app.agents.registry import SPECIALISTS
 from app.agents.supervisor import plan_assignments
 from app.agents.validator import validate_findings
 from app.core.logging import get_logger
+from app.core.resilience import short_error
 from app.graph.state import ReviewState, SpecialistTask
 from app.tools.github_client import GitHubClient, GitHubClientError
 from app.tools.review_formatter import format_comment, format_review_summary
@@ -84,8 +85,9 @@ def specialist_node(task: SpecialistTask) -> dict:
     try:
         return {"findings": runner(pr, file_diff, task["static"])}
     except Exception as exc:  # noqa: BLE001 - node boundary, must not crash the graph
-        logger.exception("Specialist %s failed on %s", agent, path)
-        return {"errors": [f"{agent}:{path}: {exc}"]}
+        message = short_error(exc)
+        logger.error("Specialist %s failed on %s: %s", agent, path, message)
+        return {"errors": [f"{agent}:{path}: {message}"]}
 
 
 def validator_node(state: ReviewState) -> dict:

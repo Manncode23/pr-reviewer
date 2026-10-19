@@ -1,0 +1,58 @@
+{
+  "generated_at": "2026-10-19T10:30:10.575180+00:00",
+  "model": "gemini-3.8-flash",
+  "agents": [
+    "security",
+    "bugs"
+  ],
+  "tolerance": 2,
+  "complete": false,
+  "summary": {
+    "cases": 2,
+    "expected_issues": 2,
+    "matched_issues": 2,
+    "findings": 2,
+    "matched_findings": 2,
+    "recall": 1.0,
+    "precision": 1.0,
+    "f1": 1.0,
+    "clean_case_false_alarms": 0
+  },
+  "cases": [
+    {
+      "case_id": "sqli_fstring",
+      "clean": false,
+      "expected": 1,
+      "findings": 1,
+      "matched_expected": 1,
+      "matched_findings": 1,
+      "missed": [],
+      "false_positives": [],
+      "false_alarms": 0
+    },
+    {
+      "case_id": "hardcoded_api_key",
+      "clean": false,
+      "expected": 1,
+      "findings": 1,
+      "matched_expected": 1,
+      "matched_findings": 1,
+      "missed": [],
+      "false_positives": [],
+      "false_alarms": 0
+    }
+  ],
+  "pending": [
+    "command_injection",
+    "unsafe_pickle",
+    "path_traversal",
+    "weak_password_hash",
+    "tls_verification_off",
+    "division_by_zero",
+    "mutable_default_argument",
+    "off_by_one_range",
+    "clean_repository_code",
+    "clean_math_helpers"
+  ],
+  "errored": {}
+}

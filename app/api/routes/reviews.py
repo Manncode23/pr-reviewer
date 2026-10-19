@@ -20,9 +20,11 @@ def _thread_id(owner: str, repo: str, pr_number: int, head_sha: str) -> str:
 def start_review(body: StartReviewRequest, manager: ReviewManager = Depends(get_manager)):
     """Queue a review (idempotent per commit). Poll status_url for progress."""
     try:
-        result = manager.submit(body.repo, body.pr_number)
+        result = manager.submit(body.repo, body.pr_number, force=body.force)
     except GitHubClientError as exc:
         raise HTTPException(status_code=502, detail=str(exc)) from exc
+    except ReviewStateError as exc:
+        raise HTTPException(status_code=409, detail=str(exc)) from exc
     return ReviewAccepted(
         thread_id=result.thread_id,
         status=result.status,

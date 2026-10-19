@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 
 from app.core.llm import get_llm, llm_slot
 from app.core.logging import get_logger
+from app.core.resilience import call_with_retries, short_error
 from app.schemas.findings import SEVERITY_RANK, Category, Finding
 
 logger = get_logger(__name__)
@@ -85,8 +86,12 @@ def find_duplicate_groups(findings: list[Finding]) -> list[list[int]]:
         SystemMessage(content=DEDUPE_PROMPT),
         HumanMessage(content=f"Findings:\n{listing}"),
     ]
-    with llm_slot():
-        output = structured_llm.invoke(messages)
+
+    def call():
+        with llm_slot():
+            return structured_llm.invoke(messages)
+
+    output = call_with_retries(call, label="dedupe")
     if output is None:
         return []
     return [group.indices for group in output.groups]
@@ -135,7 +140,7 @@ def aggregate_findings(findings: list[Finding]) -> list[Finding]:
     try:
         groups = find_duplicate_groups(findings)
     except Exception as exc:  # noqa: BLE001 - dedupe is best-effort
-        logger.warning("LLM dedupe failed (%s); using exact-match fallback", exc)
+        logger.warning("LLM dedupe unavailable (%s); using exact-match fallback", short_error(exc))
         groups = exact_duplicate_groups(findings)
 
     result = rank_findings(apply_groups(findings, groups))

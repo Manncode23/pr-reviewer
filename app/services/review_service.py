@@ -1,4 +1,4 @@
-"""Review lifecycle: start (idempotent), inspect, approve."""
+"""Review lifecycle: start (idempotent), inspect, approve, reset."""
 
 from langgraph.types import Command
 
@@ -20,8 +20,23 @@ def _config(thread_id: str) -> dict:
     return {"configurable": {"thread_id": thread_id}}
 
 
+def _run_config(thread_id: str) -> dict:
+    """Thread config plus labels that make LangSmith traces easy to find."""
+    config = _config(thread_id)
+    config["run_name"] = "pr-review"
+    config["tags"] = ["pr-reviewer"]
+    try:
+        repo, rest = thread_id.split("#", 1)
+        number, sha = rest.split("@", 1)
+        config["metadata"] = {"repo": repo, "pr_number": int(number), "head_sha": sha}
+    except ValueError:
+        pass  # unusual thread ID: still run, just without the extra labels
+    return config
+
+
 def _to_result(values: dict) -> ReviewResult:
     pr = values["pr"]
+    errors = values.get("errors", [])
     return ReviewResult(
         repo=pr.repo,
         pr_number=pr.number,
@@ -30,8 +45,9 @@ def _to_result(values: dict) -> ReviewResult:
         raw_findings_count=len(values.get("findings", [])),
         findings=values.get("final_findings", []),
         dropped=values.get("dropped", []),
-        errors=values.get("errors", []),
+        errors=errors,
         published=values.get("published", False),
+        degraded=bool(errors),
     )
 
 
@@ -72,7 +88,7 @@ class ReviewService:
         if head_sha is None:
             head_sha = self._client.get_head_sha(repo, pr_number)
         thread_id = self.thread_id_for(repo, pr_number, head_sha)
-        config = _config(thread_id)
+        config = _run_config(thread_id)
 
         existing = self.get(thread_id)
         if existing and existing.status is ReviewStatus.INCOMPLETE:
@@ -100,6 +116,20 @@ class ReviewService:
             )
 
         self._graph.invoke(
-            Command(resume={"approved": approved_indices}), config=_config(thread_id)
+            Command(resume={"approved": approved_indices}), config=_run_config(thread_id)
         )
         return self.get(thread_id)
+
+    def reset(self, thread_id: str) -> None:
+        """Forget a review so this commit can be reviewed again from scratch."""
+        session = self.get(thread_id)
+        if session and session.result and session.result.published:
+            raise ReviewStateError(
+                "This review was already published; refusing to run it again "
+                "(it would post duplicate comments)"
+            )
+        checkpointer = getattr(self._graph, "checkpointer", None)
+        if checkpointer is None or not hasattr(checkpointer, "delete_thread"):
+            raise ReviewStateError("The checkpointer does not support resetting reviews")
+        checkpointer.delete_thread(thread_id)
+        logger.info("Reset review %s", thread_id)
