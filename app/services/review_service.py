@@ -44,6 +44,11 @@ class ReviewService:
     def thread_id_for(repo: str, pr_number: int, head_sha: str) -> str:
         return f"{repo}#{pr_number}@{head_sha}"
 
+    def resolve_thread(self, repo: str, pr_number: int) -> tuple[str, str]:
+        """Look up the PR's current commit and return (thread_id, head_sha)."""
+        head_sha = self._client.get_head_sha(repo, pr_number)
+        return self.thread_id_for(repo, pr_number, head_sha), head_sha
+
     def get(self, thread_id: str) -> ReviewSession | None:
         snapshot = self._graph.get_state(_config(thread_id))
         values = snapshot.values or {}
@@ -60,9 +65,12 @@ class ReviewService:
         result = _to_result(values) if "pr" in values else None
         return ReviewSession(thread_id=thread_id, status=status, result=result)
 
-    def start(self, repo: str, pr_number: int) -> ReviewSession:
+    def start(
+        self, repo: str, pr_number: int, head_sha: str | None = None
+    ) -> ReviewSession:
         """Run a review, or reuse/continue the one that exists for this commit."""
-        head_sha = self._client.get_head_sha(repo, pr_number)
+        if head_sha is None:
+            head_sha = self._client.get_head_sha(repo, pr_number)
         thread_id = self.thread_id_for(repo, pr_number, head_sha)
         config = _config(thread_id)
 

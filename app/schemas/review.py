@@ -27,6 +27,7 @@ class ReviewResult(BaseModel):
 
 
 class ReviewStatus(str, Enum):
+    RUNNING = "running"  # queued or executing in this process
     AWAITING_APPROVAL = "awaiting_approval"  # paused at the human gate
     COMPLETED = "completed"
     INCOMPLETE = "incomplete"  # a run stopped midway (crash); can be continued
@@ -36,3 +37,4 @@ class ReviewSession(BaseModel):
     thread_id: str
     status: ReviewStatus
     result: ReviewResult | None = None
+    error: str | None = None  # why the last background run failed, if it did
